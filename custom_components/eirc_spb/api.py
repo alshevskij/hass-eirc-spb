@@ -1,6 +1,7 @@
 """Async API client for the IKUS / ЕИРЦ СПб service."""
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from urllib.parse import quote
 from uuid import UUID
@@ -64,6 +65,7 @@ class EircApiClient:
         self.session_cookie = session_cookie
         self.token_auth = token_auth
         self.token_verify = token_verify
+        self._reauth_lock = asyncio.Lock()
 
     @property
     def token_data(self) -> dict[str, str | None]:
@@ -97,7 +99,9 @@ class EircApiClient:
         except (aiohttp.ContentTypeError, ValueError):
             payload = await response.text()
         if response.status in (401, 403):
-            raise EircAuthError("Сессия IKUS истекла или требует повторной авторизации")
+            raise EircAuthError(
+                "Сессия IKUS истекла или требует повторной авторизации"
+            )
         if not 200 <= response.status < 300:
             message = payload.get("message") if isinstance(payload, dict) else payload
             raise EircApiError(
@@ -106,13 +110,34 @@ class EircApiClient:
         return payload
 
     async def _request(
-        self, method: str, url: str, *, json: Any = None, authenticated: bool = True
+        self,
+        method: str,
+        url: str,
+        *,
+        json: Any = None,
+        authenticated: bool = True,
     ) -> Any:
+        """Send a request and renew expired auth for safe read requests."""
         try:
-            async with self._session.request(
-                method, url, headers=self._headers(authenticated), json=json, timeout=_TIMEOUT
-            ) as response:
-                return await self._decode(response)
+            try:
+                async with self._session.request(
+                    method,
+                    url,
+                    headers=self._headers(authenticated),
+                    json=json,
+                    timeout=_TIMEOUT,
+                ) as response:
+                    return await self._decode(response)
+            except EircAuthError:
+                # Never replay a POST: it may submit a meter reading twice.
+                if not authenticated or method.upper() != "GET":
+                    raise
+                previous_auth = self.token_auth
+                await self.async_reauthenticate(previous_auth)
+                async with self._session.request(
+                    method, url, headers=self._headers(authenticated), json=json, timeout=_TIMEOUT
+                ) as response:
+                    return await self._decode(response)
         except EircApiError:
             raise
         except (aiohttp.ClientError, TimeoutError) as err:
@@ -160,7 +185,46 @@ class EircApiClient:
         if not self.token_auth:
             raise EircApiError("IKUS не вернул токен авторизации")
 
-    async def _decode_auth_response(self, response: aiohttp.ClientResponse) -> dict[str, Any]:
+    async def async_reauthenticate(self, previous_auth: str | None = None) -> None:
+        """Renew the IKUS auth token using the saved verified token."""
+        async with self._reauth_lock:
+            if previous_auth and self.token_auth != previous_auth:
+                return
+            if not self.token_verify:
+                self.token_auth = None
+                await self.async_authenticate()
+                return
+            headers = self._headers(authenticated=False)
+            headers["Auth-Verification"] = self.token_verify
+            headers["withTotp"] = "true"
+            headers["Captcha"] = "none"
+            payload = {
+                "type": "PHONE",
+                "login": self._username,
+                "password": self._password,
+            }
+            try:
+                async with self._session.post(
+                    AUTH_URL, headers=headers, json=payload, timeout=_TIMEOUT
+                ) as response:
+                    data = await self._decode_auth_response(response)
+            except EircApiError:
+                raise
+            except (aiohttp.ClientError, TimeoutError) as err:
+                raise EircApiError(
+                f"Ошибка повторной авторизации IKUS: {err}"
+            ) from err
+            new_auth = data.get("auth")
+            if not new_auth:
+                raise EircApiError(
+                "IKUS не вернул новый токен при повторной авторизации"
+            )
+            self.token_auth = new_auth
+            self.token_verify = data.get("verified") or self.token_verify
+
+    async def _decode_auth_response(
+        self, response: aiohttp.ClientResponse
+    ) -> dict[str, Any]:
         if response.status == 424:
             data = await response.json(content_type=None)
             transaction_id = data.get("transactionId")
