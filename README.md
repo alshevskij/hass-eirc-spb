@@ -1,4 +1,8 @@
-# ЕИРЦ Санкт-Петербурга для Home Assistant
+# ЕИРЦ СПб: Личный кабинет для Home Assistant
+
+<p align="center">
+  <img width="381" height="128" alt="logo_eirc" src="https://github.com/user-attachments/assets/ab8497fb-a7a4-4ce9-a779-139974b43ca0" />
+</p>
 
 Интеграция Home Assistant для личного кабинета ЕИРЦ Санкт-Петербурга / ПСК (IKUS).
 
