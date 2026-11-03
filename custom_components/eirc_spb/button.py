@@ -16,7 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import EircSpbCoordinator
-from .helpers import meter_label
+from .helpers import format_bill_period, meter_label
 
 
 async def async_setup_entry(
@@ -163,7 +163,9 @@ class EircOpenCurrentBillButton(CoordinatorEntity[EircSpbCoordinator], ButtonEnt
         ) or account.get("alias") or "выбранного лицевого счёта"
         url = self.coordinator.async_bill_url(self._account_id, str(bill_id))
         details = []
-        period = bill.get("period") or bill.get("name") or bill.get("timestamp")
+        period = format_bill_period(
+            bill.get("period") or bill.get("name") or bill.get("timestamp")
+        )
         amount = bill.get("amount")
         if period is not None:
             details.append(f"за {period}")
