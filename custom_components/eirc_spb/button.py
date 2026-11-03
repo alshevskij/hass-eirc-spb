@@ -1,6 +1,7 @@
 """Buttons for submitting IKUS meter readings."""
 from __future__ import annotations
 
+import html
 import math
 from typing import Any
 
@@ -172,7 +173,7 @@ class EircOpenCurrentBillButton(CoordinatorEntity[EircSpbCoordinator], ButtonEnt
         persistent_notification.async_create(
             self.hass,
             (
-                f"Квитанция для {register} ({description}). "
+                f"Квитанция для {html.escape(str(register))} ({html.escape(description)}). "
                 f'<a href="{url}" target="_blank" rel="noopener noreferrer">'
                 "Открыть PDF</a>"
             ),
