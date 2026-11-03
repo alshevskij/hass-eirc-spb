@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 from urllib.parse import quote
+from uuid import UUID
 
 import aiohttp
 from homeassistant.core import HomeAssistant
@@ -13,6 +14,8 @@ from yarl import URL
 from .const import (
     ACCOUNTS_URL,
     AUTH_URL,
+    BILL_FILE_URL,
+    BILL_UUID_URL,
     COOKIE_URL,
     CURRENT_BILL_URL,
     METERS_INFO_URL,
@@ -21,6 +24,7 @@ from .const import (
 )
 
 _TIMEOUT = aiohttp.ClientTimeout(total=30)
+_MAX_PDF_SIZE = 25 * 1024 * 1024
 _USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"
 
 
@@ -218,6 +222,61 @@ class EircApiClient:
         url = CURRENT_BILL_URL.format(account_id=quote(str(account_id), safe=""))
         data = await self._request("GET", url)
         return data if isinstance(data, dict) else {}
+
+    async def async_get_bill_pdf(self, account_id: int | str, bill_id: str) -> bytes:
+        """Fetch a bill PDF using a fresh, short-lived UUID from IKUS."""
+        account = quote(str(account_id), safe="")
+        bill = quote(str(bill_id), safe="")
+        uuid_url = BILL_UUID_URL.format(account_id=account, bill_id=bill)
+
+        try:
+            async with self._session.get(
+                uuid_url, headers=self._headers(), timeout=_TIMEOUT
+            ) as response:
+                if response.status in (401, 403):
+                    raise EircAuthError("Сессия IKUS истекла или требует повторной авторизации")
+                if response.status != 200:
+                    await response.read()
+                    raise EircApiError(
+                        f"IKUS не смог подготовить квитанцию (HTTP {response.status})"
+                    )
+                raw_uuid = (await response.text()).strip().strip('"')
+        except EircApiError:
+            raise
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise EircApiError("Не удалось получить временный идентификатор квитанции") from err
+
+        try:
+            file_uuid = str(UUID(raw_uuid))
+        except (ValueError, AttributeError) as err:
+            raise EircApiError("IKUS вернул некорректный временный идентификатор квитанции") from err
+
+        try:
+            async with self._session.get(
+                BILL_FILE_URL.format(uuid=file_uuid),
+                headers={**self._headers(), "Accept": "application/pdf, */*"},
+                timeout=_TIMEOUT,
+            ) as response:
+                if response.status in (401, 403):
+                    raise EircAuthError("Сессия IKUS истекла или требует повторной авторизации")
+                if response.status != 200:
+                    await response.read()
+                    raise EircApiError(
+                        f"IKUS не смог выдать PDF квитанции (HTTP {response.status})"
+                    )
+                if response.content_length and response.content_length > _MAX_PDF_SIZE:
+                    raise EircApiError("Размер PDF квитанции превышает 25 МиБ")
+                content = await response.read()
+        except EircApiError:
+            raise
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise EircApiError("Не удалось загрузить PDF квитанции") from err
+
+        if len(content) > _MAX_PDF_SIZE:
+            raise EircApiError("Размер PDF квитанции превышает 25 МиБ")
+        if not content.startswith(b"%PDF-"):
+            raise EircApiError("IKUS вернул файл, который не является PDF")
+        return content
 
     async def async_submit_reading(
         self,
