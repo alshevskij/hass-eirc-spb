@@ -15,6 +15,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import EircApiClient, EircApiError, EircAuthError
+from .helpers import format_bill_period
 from .const import (
     CONF_PASSWORD,
     CONF_SELECTED_ACCOUNTS,
@@ -104,7 +105,9 @@ class EircSpbCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             register = (
                 tenancy.get("register") if isinstance(tenancy, dict) else None
             ) or account.get("alias") or "лицевому счёту"
-            period = bill.get("period") or bill.get("name") or bill.get("timestamp")
+            period = format_bill_period(
+                bill.get("period") or bill.get("name") or bill.get("timestamp")
+            )
             amount = bill.get("amount")
             details = []
             if period is not None:
