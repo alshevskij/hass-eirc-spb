@@ -1,14 +1,86 @@
 """The ЕИРЦ СПб integration."""
 from __future__ import annotations
 
-from homeassistant.config_entries import ConfigEntry
+import logging
+import re
+
+from aiohttp import web
+from homeassistant.components.http import KEY_HASS, HomeAssistantView
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
+from .api import EircApiError, EircAuthError
 from .const import DOMAIN
 from .coordinator import EircSpbCoordinator
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.NUMBER, Platform.BUTTON]
+_LOGGER = logging.getLogger(__name__)
+
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.NUMBER,
+    Platform.BUTTON,
+]
+
+
+class EircBillView(HomeAssistantView):
+    """Serve the current bill PDF through a signed Home Assistant URL."""
+
+    url = "/api/eirc_spb/bill/{entry_id}/{account_id}/{bill_id}"
+    name = "api:eirc_spb:bill"
+    requires_auth = True
+
+    async def get(
+        self,
+        request: web.Request,
+        entry_id: str,
+        account_id: str,
+        bill_id: str,
+    ) -> web.Response:
+        hass = request.app[KEY_HASS]
+        entry = hass.config_entries.async_get_entry(entry_id)
+        if (
+            entry is None
+            or entry.domain != DOMAIN
+            or entry.state is not ConfigEntryState.LOADED
+        ):
+            raise web.HTTPNotFound()
+
+        coordinator: EircSpbCoordinator = hass.data[DOMAIN][entry_id]
+        payload = coordinator.data.get(account_id)
+        if payload is None:
+            raise web.HTTPNotFound()
+        current_bill = payload.get("bill", {})
+        if str(current_bill.get("id", "")) != bill_id:
+            # IKUS exposes only the current bill. Do not let a stale URL
+            # accidentally return a different document.
+            raise web.HTTPNotFound()
+
+        try:
+            content = await coordinator.client.async_get_bill_pdf(account_id, bill_id)
+        except EircAuthError as err:
+            _LOGGER.error("Авторизация IKUS не удалась при получении PDF квитанции")
+            raise web.HTTPBadGateway() from err
+        except EircApiError as err:
+            _LOGGER.error("Не удалось получить PDF квитанции ЕИРЦ: %s", err)
+            raise web.HTTPBadGateway() from err
+
+        filename = re.sub(r"[^A-Za-z0-9._-]", "_", f"eirc-spb-{bill_id}.pdf")[:120]
+        return web.Response(
+            body=content,
+            content_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Register the PDF endpoint once for the integration domain."""
+    hass.http.register_view(EircBillView())
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
