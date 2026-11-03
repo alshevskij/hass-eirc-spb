@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import html
 import logging
+from datetime import timedelta
+from urllib.parse import quote
 
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
@@ -96,11 +98,10 @@ class EircSpbCoordinator(DataUpdateCoordinator[dict[str, dict]]):
 
             bill = accounts[account_id].get("bill", {})
             account = accounts[account_id].get("account", {})
+            tenancy = account.get("tenancy")
             register = (
-                account.get("tenancy", {}).get("register")
-                or account.get("alias")
-                or "лицевому счёту"
-            )
+                tenancy.get("register") if isinstance(tenancy, dict) else None
+            ) or account.get("alias") or "лицевому счёту"
             period = bill.get("period") or bill.get("name") or bill.get("timestamp")
             amount = bill.get("amount")
             details = []
@@ -160,8 +161,6 @@ class EircSpbCoordinator(DataUpdateCoordinator[dict[str, dict]]):
 
     def async_bill_url(self, account_id: str, bill_id: str) -> str:
         """Return a 24-hour signed URL for the current bill PDF."""
-        from urllib.parse import quote
-
         path = (
             f"/api/eirc_spb/bill/{self.entry.entry_id}/"
             f"{quote(str(account_id), safe='')}/{quote(str(bill_id), safe='')}"
