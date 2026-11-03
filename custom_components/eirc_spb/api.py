@@ -266,7 +266,14 @@ class EircApiClient:
                     )
                 if response.content_length and response.content_length > _MAX_PDF_SIZE:
                     raise EircApiError("Размер PDF квитанции превышает 25 МиБ")
-                content = await response.read()
+                chunks: list[bytes] = []
+                total_size = 0
+                async for chunk in response.content.iter_chunked(64 * 1024):
+                    total_size += len(chunk)
+                    if total_size > _MAX_PDF_SIZE:
+                        raise EircApiError("Размер PDF квитанции превышает 25 МиБ")
+                    chunks.append(chunk)
+                content = b"".join(chunks)
         except EircApiError:
             raise
         except (aiohttp.ClientError, TimeoutError) as err:
