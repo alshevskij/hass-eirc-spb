@@ -1,4 +1,4 @@
-"""Config flow for ЕИРЦ Санкт-Петербурга."""
+"""Config flow for ЕИРЦ СПб: Личный кабинет."""
 from __future__ import annotations
 
 import logging
@@ -149,7 +149,7 @@ class EircSpbConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             assert self._client is not None
             return self.async_create_entry(
-                title="ЕИРЦ Санкт-Петербурга",
+                title="ЕИРЦ СПб: Личный кабинет",
                 data={
                     CONF_USERNAME: self._username,
                     CONF_PASSWORD: self._password,

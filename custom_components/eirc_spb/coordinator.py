@@ -32,6 +32,7 @@ class EircSpbCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             config_entry=entry,
         )
         self.entry = entry
+        self.pending_readings: dict[tuple[str, str, int], float | int | None] = {}
         self.client = EircApiClient(
             hass, entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD],
             session_cookie=entry.data.get(CONF_SESSION_COOKIE),

@@ -1,4 +1,4 @@
-"""Sensors for ЕИРЦ СПб meter readings."""
+"""Sensors for ЕИРЦ СПб meter readings and account balance."""
 from __future__ import annotations
 
 from typing import Any
@@ -17,12 +17,13 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import EircSpbCoordinator
+from .helpers import meter_label, meter_utility
 
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Create one sensor per meter register."""
+    """Create one sensor per meter register and account."""
     coordinator: EircSpbCoordinator = hass.data[DOMAIN][entry.entry_id]
     entities: list[SensorEntity] = []
     for account_id, payload in coordinator.data.items():
@@ -48,8 +49,12 @@ class EircMeterSensor(CoordinatorEntity[EircSpbCoordinator], SensorEntity):
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
 
     def __init__(
-        self, coordinator: EircSpbCoordinator, account_id: str,
-        account: dict[str, Any], meter: dict[str, Any], indication: dict[str, Any],
+        self,
+        coordinator: EircSpbCoordinator,
+        account_id: str,
+        account: dict[str, Any],
+        meter: dict[str, Any],
+        indication: dict[str, Any],
     ) -> None:
         super().__init__(coordinator)
         self._account_id = account_id
@@ -58,32 +63,8 @@ class EircMeterSensor(CoordinatorEntity[EircSpbCoordinator], SensorEntity):
         self._account_register = str(
             account.get("tenancy", {}).get("register", account_id)
         )
-        subservice_id = meter.get("subserviceId")
-        utility = (
-            (meter.get("subservice") or {}).get("utility") or meter.get("utility") or ""
-        ).upper()
-        if not utility:
-            utility = {
-                54179: "ELECTRICITY",
-                4599: "WATER",
-                4600: "WATER",
-            }.get(subservice_id, "")
-        meter_name = (
-            meter.get("name") or (meter.get("subservice") or {}).get("name")
-            or {
-                54179: "Электроэнергия",
-                4600: "Холодная вода",
-                4599: "Горячая вода",
-            }.get(subservice_id, {
-                "WATER": "Водоснабжение", "ELECTRICITY": "Электроэнергия",
-                "GAS": "Газ",
-            }.get(utility, "Счётчик"))
-        )
-        scale_name = indication.get("scaleName")
-        self._attr_name = (
-            f"{meter_name} — {scale_name}"
-            if scale_name and scale_name not in meter_name else meter_name
-        )
+        utility = meter_utility(meter)
+        self._attr_name = f"{meter_label(meter, indication)}: текущие показания"
         self._attr_unique_id = (
             f"{DOMAIN}_{account_id}_{self._registration}_{self._scale_id}"
         )
@@ -104,11 +85,13 @@ class EircMeterSensor(CoordinatorEntity[EircSpbCoordinator], SensorEntity):
 
     @property
     def native_value(self) -> int | float | None:
+        """Return the latest accepted meter reading."""
         indication = self._current_indication()
         return indication.get("previousReading") if indication else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose useful meter and acceptance-period details."""
         payload = self.coordinator.data.get(self._account_id, {})
         account = payload.get("account", {})
         meter = self._current_meter() or {}
@@ -136,7 +119,10 @@ class EircMeterSensor(CoordinatorEntity[EircSpbCoordinator], SensorEntity):
         payload = self.coordinator.data.get(self._account_id, {})
         for meter in payload.get("meters", []):
             meter_ref = meter.get("id") or {}
-            if isinstance(meter_ref, dict) and str(meter_ref.get("registration")) == self._registration:
+            if (
+                isinstance(meter_ref, dict)
+                and str(meter_ref.get("registration")) == self._registration
+            ):
                 return meter
         return None
 
@@ -149,12 +135,12 @@ class EircMeterSensor(CoordinatorEntity[EircSpbCoordinator], SensorEntity):
                 return indication
         return None
 
- 
+
 class EircCurrentBillSensor(CoordinatorEntity[EircSpbCoordinator], SensorEntity):
-    """Current bill amount for one personal account."""
+    """Current debt amount for one personal account."""
 
     _attr_has_entity_name = True
-    _attr_name = "Сумма текущего счёта"
+    _attr_name = "Задолженность"
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "RUB"
@@ -177,11 +163,13 @@ class EircCurrentBillSensor(CoordinatorEntity[EircSpbCoordinator], SensorEntity)
 
     @property
     def native_value(self) -> int | float | None:
+        """Return the current debt amount."""
         bill = self.coordinator.data.get(self._account_id, {}).get("bill", {})
         return bill.get("amount")
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose bill metadata."""
         bill = self.coordinator.data.get(self._account_id, {}).get("bill", {})
         return {
             "account_id": self._account_id,

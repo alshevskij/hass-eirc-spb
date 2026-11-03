@@ -17,6 +17,7 @@ from .const import (
     CURRENT_BILL_URL,
     METERS_INFO_URL,
     READING_PERIOD_URL,
+    SUBMIT_READING_URL,
 )
 
 _TIMEOUT = aiohttp.ClientTimeout(total=30)
@@ -168,6 +169,7 @@ class EircApiClient:
         return data
 
     async def async_send_email_code(self, transaction_id: str) -> None:
+        """Request an email verification code."""
         url = (
             "https://ikus.pesc.ru/api/v7/users/"
             f"{quote(transaction_id, safe='')}/email/check/confirmation/send"
@@ -175,6 +177,7 @@ class EircApiClient:
         await self._request("POST", url, authenticated=False)
 
     async def async_verify_email_code(self, transaction_id: str, code: str) -> None:
+        """Verify an email confirmation code."""
         url = (
             "https://ikus.pesc.ru/api/v7/users/"
             f"{quote(transaction_id, safe='')}/email/check/verification"
@@ -188,12 +191,14 @@ class EircApiClient:
         self.token_verify = data["verified"]
 
     async def async_get_accounts(self) -> list[dict[str, Any]]:
+        """Fetch available personal accounts."""
         data = await self._request("GET", ACCOUNTS_URL)
         if not isinstance(data, list):
             raise EircApiError("IKUS вернул неожиданный список лицевых счетов")
         return data
 
     async def async_get_meters(self, account_id: int | str) -> list[dict[str, Any]]:
+        """Fetch meter readings for an account."""
         url = METERS_INFO_URL.format(account_id=quote(str(account_id), safe=""))
         data = await self._request("GET", url)
         if isinstance(data, dict):
@@ -203,6 +208,7 @@ class EircApiClient:
         return data
 
     async def async_get_reading_period(self, account_id: int | str) -> dict[str, Any]:
+        """Fetch the current meter-reading acceptance period."""
         url = READING_PERIOD_URL.format(account_id=quote(str(account_id), safe=""))
         data = await self._request("GET", url)
         return data if isinstance(data, dict) else {}
@@ -212,3 +218,21 @@ class EircApiClient:
         url = CURRENT_BILL_URL.format(account_id=quote(str(account_id), safe=""))
         data = await self._request("GET", url)
         return data if isinstance(data, dict) else {}
+
+    async def async_submit_reading(
+        self,
+        account_id: int | str,
+        registration: str,
+        scale_id: int,
+        value: float,
+    ) -> Any:
+        """Submit one meter reading. The caller must verify it with a fresh GET."""
+        url = SUBMIT_READING_URL.format(
+            account_id=quote(str(account_id), safe=""),
+            registration=quote(str(registration), safe=""),
+        )
+        return await self._request(
+            "POST",
+            url,
+            json=[{"scaleId": scale_id, "value": value}],
+        )

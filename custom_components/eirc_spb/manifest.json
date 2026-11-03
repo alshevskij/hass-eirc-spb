@@ -1,10 +1,10 @@
 {
   "domain": "eirc_spb",
-  "name": "ЕИРЦ Санкт-Петербурга",
+  "name": "ЕИРЦ СПб: Личный кабинет",
   "codeowners": ["@alshevskij"],
   "config_flow": true,
   "documentation": "https://github.com/alshevskij/hass-eirc-spb",
   "iot_class": "cloud_polling",
   "requirements": [],
-  "version": "2026.11.0"
+  "version": "2026.11.1"
 }

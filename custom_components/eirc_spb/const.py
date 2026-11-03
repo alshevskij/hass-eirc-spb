@@ -1,4 +1,4 @@
-"""Constants for the ЕИРЦ Санкт-Петербурга integration."""
+"""Constants for the ЕИРЦ СПб integration."""
 from datetime import timedelta
 
 DOMAIN = "eirc_spb"
@@ -17,3 +17,6 @@ ACCOUNTS_URL = f"{API_BASE_URL}/v8/accounts"
 METERS_INFO_URL = f"{API_BASE_URL}/v6/accounts/{{account_id}}/meters/info"
 READING_PERIOD_URL = f"{API_BASE_URL}/v6/accounts/{{account_id}}/reading/period"
 CURRENT_BILL_URL = f"{API_BASE_URL}/v8/accounts/{{account_id}}/payments/bills/current"
+SUBMIT_READING_URL = (
+    f"{API_BASE_URL}/v8/accounts/{{account_id}}/meters/{{registration}}/reading"
+)
