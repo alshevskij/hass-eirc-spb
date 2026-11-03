@@ -5,11 +5,11 @@
     "@alshevskij"
   ],
   "config_flow": true,
+  "dependencies": [
+    "http"
+  ],
   "documentation": "https://github.com/alshevskij/hass-eirc-spb",
   "iot_class": "cloud_polling",
   "requirements": [],
-  "version": "2026.11.2",
-  "dependencies": [
-    "http"
-  ]
+  "version": "2026.11.2"
 }
