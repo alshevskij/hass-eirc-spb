@@ -56,7 +56,7 @@ def format_bill_period(value: Any) -> str:
             continue
 
     try:
-        return datetime.fromisoformat(text.replace("Z", "+00:00")).strftime(
+        return datetime.fromisoformat(text).strftime(
             "%d.%m.%Y"
         )
     except ValueError:
