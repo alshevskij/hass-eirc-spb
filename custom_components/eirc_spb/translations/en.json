@@ -1,0 +1,40 @@
+{
+  "title": "EIRC SPb: Personal Account",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sign in",
+        "description": "Enter your phone number and IKUS account password.",
+        "data": {"username": "Phone number", "password": "Password"}
+      },
+      "2fa": {
+        "title": "Verify sign-in",
+        "description": "Enter the code sent to your confirmed email address.",
+        "data": {"code": "Verification code"}
+      },
+      "account": {
+        "title": "Select accounts",
+        "description": "Choose the accounts to add to Home Assistant.",
+        "data": {"selected_accounts": "Accounts"}
+      },
+      "reauth_confirm": {
+        "title": "Re-authentication",
+        "description": "Enter the password for {username}.",
+        "data": {"password": "Password"}
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid phone number or password.",
+      "cannot_connect": "Unable to connect to IKUS.",
+      "cannot_fetch_accounts": "Unable to retrieve accounts.",
+      "invalid_code": "Invalid verification code.",
+      "unsupported_2fa": "The requested verification method is not supported.",
+      "cannot_send_code": "Unable to send the verification code."
+    },
+    "abort": {
+      "already_configured": "This account is already configured.",
+      "no_accounts": "No confirmed accounts are available.",
+      "reauth_successful": "Re-authentication completed."
+    }
+  }
+}
