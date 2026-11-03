@@ -154,7 +154,7 @@ PDF выдаётся через защищённый HTTP-адрес Home Assist
 
 ## История изменений
 
-### 2026.11.2
+### [2026.11.2](https://github.com/alshevskij/hass-eirc-spb/releases/tag/2026.11.2)
 
 - Добавлено получение PDF текущей квитанции через временный UUID IKUS.
 - Добавлен HTTP-адрес Home Assistant для открытия PDF в браузере по подписанной ссылке.
