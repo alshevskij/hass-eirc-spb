@@ -34,7 +34,10 @@ class EircSpbCoordinator(DataUpdateCoordinator[dict[str, dict]]):
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         super().__init__(
-            hass, _LOGGER, name=DOMAIN, update_interval=DEFAULT_SCAN_INTERVAL,
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+            update_interval=DEFAULT_SCAN_INTERVAL,
             config_entry=entry,
         )
         self.entry = entry
@@ -47,7 +50,6 @@ class EircSpbCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             token_auth=entry.data.get(CONF_TOKEN_AUTH),
             token_verify=entry.data.get(CONF_TOKEN_VERIFY),
         )
-
 
     async def _async_process_current_bills(
         self, accounts: dict[str, dict]
