@@ -11,5 +11,5 @@
   "documentation": "https://github.com/alshevskij/hass-eirc-spb",
   "iot_class": "cloud_polling",
   "requirements": [],
-  "version": "2026.11.2"
+  "version": "2026.11.3"
 }
