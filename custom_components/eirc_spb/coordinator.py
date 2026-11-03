@@ -7,9 +7,9 @@ from datetime import timedelta
 from urllib.parse import quote
 
 from homeassistant.components import persistent_notification
+from homeassistant.components.http.auth import async_sign_path
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.components.http.auth import async_sign_path
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
